@@ -8,7 +8,8 @@ class DockerMonitor < Scout::Plugin
   EOS
 
   def build_report
-    containers = containers_from_options || running_container_ids
+    containers = matched_container_names
+    containers = running_container_ids if (containers.nil? or containers.size == 0)
     @stats = {:number_of_containers => number_of_running_containers, :cpu_percent => 0.0, :memory_usage => 0.0, :memory_limit => 0.0, :network_in => 0.0, :network_out => 0.0}
     containers.each do |container_id|
       add_container_stats(container_id)
@@ -69,11 +70,27 @@ class DockerMonitor < Scout::Plugin
     if(containers_from_options)
       containers_from_options.select do |container|
         match_by_id = running_container_ids.select { |id| /\A#{container}/ =~ id }.count > 0
-        match_by_name = running_container_names.include?(container)
+        match_by_name = running_container_names.select { |name| /#{container}/i =~ name }.count > 0
         match_by_id || match_by_name
       end.count
     else
       running_container_ids.count
+    end
+  end
+
+  def matched_container_names
+    if(containers_from_options)
+      matched_names = containers_from_options.select do |container|
+        match_by_name = running_container_names.select { |name| /#{container}/i =~ name }.count > 0
+        if match_by_name
+          container
+        else
+          false
+        end
+      end
+      matched_names
+    else
+      []
     end
   end
 
